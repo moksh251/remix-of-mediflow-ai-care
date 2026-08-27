@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "sdk_version": "0.27.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "mediflow-ai-care",
+      "version": "0.1.0",
+      "title": "Mediflow AI Care"
+    },
+    "tools": [
+      {
+        "name": "list_hospitals",
+        "title": "List hospitals",
+        "description": "List every hospital in the Mediflow demo network with city, opening hours and current department queue load.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_doctors",
+        "title": "List doctors and live queue",
+        "description": "List Mediflow demo doctors with status, consultation fee, patients ahead, estimated wait time and next slot. Optionally filter by hospital or department.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "hospital_id": {
+              "description": "Hospital id such as h1..h5.",
+              "type": "string"
+            },
+            "department": {
+              "description": "Department name, e.g. General Medicine, Pediatrics, Gynecology, Gastroenterology, Neurology.",
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "shortest_wait",
+        "title": "Find shortest waiting times",
+        "description": "Rank Mediflow demo doctors by shortest estimated waiting time, optionally scoped to a hospital or department.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "hospital_id": {
+              "description": "Hospital id such as h1..h5.",
+              "type": "string"
+            },
+            "department": {
+              "description": "Department name to scope the ranking.",
+              "type": "string"
+            },
+            "limit": {
+              "description": "How many doctors to return (default 5).",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_symptom_screenings",
+        "title": "List symptom screenings",
+        "description": "List the symptom concerns Mediflow can screen, and optionally the screening questions for specific symptom ids. Care navigation only, never a diagnosis.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "symptom_ids": {
+              "description": "Symptom ids to include questions for, e.g. ['fever','headache'].",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "navigate_care",
+        "title": "Navigate to the right care category",
+        "description": "Run the Mediflow screening rules on reported symptoms and answers to suggest a care category (department) and the best matching doctors with waiting times. Never returns a diagnosis, medicine or treatment advice.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "hospital_id": {
+              "type": "string",
+              "description": "Hospital id such as h1..h5."
+            },
+            "symptom_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Symptom ids from list_symptom_screenings, e.g. ['fever']."
+            },
+            "answers": {
+              "description": "Answers keyed as '<symptom_id>:<question_id>', e.g. {'fever:breathing':'Yes'}.",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "free_text": {
+              "description": "Anything else the patient described, in their own words.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "hospital_id",
+            "symptom_ids"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "track_token",
+        "title": "Track a queue token",
+        "description": "Look up a Mediflow demo queue token (e.g. A-104) and return its doctor, queue position, status and estimated wait time.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "token": {
+              "type": "string",
+              "description": "Queue token such as A-104."
+            }
+          },
+          "required": [
+            "token"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

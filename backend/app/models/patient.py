@@ -1,0 +1,17 @@
+from datetime import datetime, timezone
+
+from pydantic import BaseModel, Field
+
+
+class PatientDoc(BaseModel):
+    id: str = Field(alias="_id")
+    name: str
+    age: int
+    sex: str
+    height: str | None = None
+    weight: str | None = None
+    phone: str
+    hospital_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = {"populate_by_name": True}
