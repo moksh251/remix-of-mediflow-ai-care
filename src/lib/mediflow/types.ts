@@ -36,6 +36,13 @@ export interface Doctor {
 
 export type QueueStatus = "waiting" | "in_consultation" | "completed" | "no_show";
 
+export interface ScreeningSnapshot {
+  urgency: "routine" | "urgent";
+  department: string;
+  reasons: string[];
+  answers: { label: string; value: string }[];
+}
+
 export interface QueueEntry {
   id: string;
   token: string;
@@ -50,6 +57,7 @@ export interface QueueEntry {
   source: "patient-app" | "reception";
   summary?: string | undefined;
   eta?: number | undefined;
+  screening?: ScreeningSnapshot | undefined;
 }
 
 export interface Booking {

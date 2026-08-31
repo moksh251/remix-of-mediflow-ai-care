@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { DOCTORS, HOSPITALS, seedQueue, tokenFor } from "./data";
-import type { Booking, Doctor, DoctorStatus, QueueEntry, StaffAlert } from "./types";
+import type { Booking, Doctor, DoctorStatus, QueueEntry, ScreeningSnapshot, StaffAlert } from "./types";
 import { getQueueStatus } from "./queue";
 
 export interface MediflowState {
@@ -75,6 +75,7 @@ export function addPatientToQueue(input: {
   concern: string;
   priority?: boolean;
   summary?: string;
+  screening?: ScreeningSnapshot;
   source?: "patient-app" | "reception";
 }): QueueEntry {
   const token = nextToken(input.hospitalId);
@@ -91,6 +92,7 @@ export function addPatientToQueue(input: {
     createdAtMin: 15 * 60 + state.counter,
     source: input.source ?? "patient-app",
     summary: input.summary,
+    screening: input.screening,
   };
   set((s) => ({ ...s, entries: [...s.entries, entry], counter: s.counter + 1, lastUpdatedTick: s.lastUpdatedTick + 1 }));
   return entry;

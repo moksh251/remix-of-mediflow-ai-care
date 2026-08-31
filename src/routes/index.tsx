@@ -2,10 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Activity,
   ArrowRight,
+  BellRing,
   BrainCircuit,
+  Building2,
   Clock,
+  Gauge,
   Hospital,
   LineChart,
+  Mail,
+  MapPin,
+  Phone,
   ShieldCheck,
   Stethoscope,
   Timer,
@@ -52,6 +58,29 @@ const WHY = [
   { title: "Calculated, not guessed", body: "Waiting time = patients ahead × average consultation duration + live consultation state." },
   { title: "Suitability over speed", body: "Shortest queue never overrides the appropriate care category." },
   { title: "Hospital in control", body: "Staff acknowledge alerts and move patients — the system only advises." },
+];
+
+const FOR_HOSPITALS = [
+  {
+    icon: Gauge,
+    title: "Smart queue balancing",
+    body: "When two doctors in the same department carry very different loads, Mediflow flags the imbalance to staff so patients can be routed to the lighter queue.",
+  },
+  {
+    icon: BellRing,
+    title: "Priority staff alerts",
+    body: "Screening responses that indicate urgency surface as a priority alert at reception with the patient's token, concern and ETA — staff stay in control.",
+  },
+  {
+    icon: LineChart,
+    title: "Role-aware dashboards",
+    body: "Reception, doctor and admin each read the same live queue state, so a booking or no-show at one desk updates every view instantly.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Care navigation, not diagnosis",
+    body: "Mediflow routes patients to the right department and surfaces emergency signs — it never names a condition or treatment. Clinical decisions stay with clinicians.",
+  },
 ];
 
 const FUTURE = [
@@ -210,7 +239,30 @@ function Landing() {
         </div>
       </Section>
 
-      <Section id="why" title="Why Mediflow" kicker="Design principles" muted>
+      <Section id="for-hospitals" title="For hospitals" kicker="Operate, don't just triage" muted>
+        <div className="grid gap-4 md:grid-cols-2">
+          {FOR_HOSPITALS.map((f) => (
+            <div key={f.title} className="surface-card p-6">
+              <f.icon className="size-5 text-primary" />
+              <h3 className="mt-3 text-base font-semibold">{f.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{f.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 surface-card flex flex-wrap items-center justify-between gap-4 p-6">
+          <div>
+            <h3 className="text-lg font-semibold">Book a walkthrough</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              See the reception, doctor and admin dashboards with your own department setup. No real patient data, no commitment.
+            </p>
+          </div>
+          <Button asChild size="lg" variant="secondary">
+            <Link to="/demo">Enter the demo <ArrowRight className="size-4" /></Link>
+          </Button>
+        </div>
+      </Section>
+
+      <Section id="why" title="Why Mediflow" kicker="Design principles">
         <div className="grid gap-4 md:grid-cols-2">
           {WHY.map((w) => (
             <div key={w.title} className="surface-card p-6">
@@ -221,7 +273,7 @@ function Landing() {
         </div>
       </Section>
 
-      <Section id="future" title="Future scope" kicker="Not built yet">
+      <Section id="future" title="Future scope" kicker="Not built yet" muted>
         <div className="flex flex-wrap gap-2">
           {FUTURE.map((f) => (
             <span key={f} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">{f}</span>
@@ -230,13 +282,48 @@ function Landing() {
       </Section>
 
       <footer className="border-t border-border bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <Logo />
-          <p className="mt-4 max-w-3xl text-xs text-muted-foreground">
-            Mediflow is a hackathon prototype using synthetic demonstration data. It does not provide medical
-            diagnosis or treatment advice, is not clinically validated, and payments shown are demo-only with no
-            real payment processing. In an emergency, contact your local emergency services.
-          </p>
+        <div className="mx-auto max-w-6xl px-4 py-12">
+          <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr]">
+            <div>
+              <Logo />
+              <p className="mt-4 max-w-md text-sm text-muted-foreground">
+                Mediflow is a hackathon prototype using synthetic demonstration data. It routes patients to
+                the right care category and makes waiting times visible — it does not provide medical
+                diagnosis or treatment advice and is not clinically validated.
+              </p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                In an emergency, contact your local emergency services immediately.
+              </p>
+            </div>
+
+            <div>
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Building2 className="size-3.5" /> Hospital interest
+              </p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li className="flex items-center gap-2"><Mail className="size-4 text-primary" /> hospitals@mediflow.demo</li>
+                <li className="flex items-center gap-2"><Phone className="size-4 text-primary" /> +91 90000 00000</li>
+                <li className="flex items-center gap-2"><MapPin className="size-4 text-primary" /> Ahmedabad, India</li>
+              </ul>
+              <p className="mt-3 text-xs text-muted-foreground">Demo contact details — not a real helpline.</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Explore</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li><Link to="/patient" className="text-muted-foreground hover:text-foreground">Find my doctor</Link></li>
+                <li><Link to="/staff" className="text-muted-foreground hover:text-foreground">Reception</Link></li>
+                <li><Link to="/doctor" className="text-muted-foreground hover:text-foreground">Doctor console</Link></li>
+                <li><Link to="/admin" className="text-muted-foreground hover:text-foreground">Admin dashboard</Link></li>
+                <li><Link to="/demo" className="text-muted-foreground hover:text-foreground">Demo room</Link></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
+            <p>© {new Date().getFullYear()} Mediflow demo. Synthetic data only. Payments are demo-only with no real processing.</p>
+            <p className="flex items-center gap-1.5"><ShieldCheck className="size-3.5" /> Care navigation, not a medical device.</p>
+          </div>
         </div>
       </footer>
     </div>

@@ -98,6 +98,12 @@ function PatientFlow() {
       concern: SYMPTOMS.filter((s) => selected.includes(s.id)).map((s) => s.label).join(", "),
       priority,
       summary,
+      screening: {
+        urgency: screening.urgent ? "urgent" : "routine",
+        department: screening.department,
+        reasons: screening.reasons,
+        answers: screening.answered,
+      },
       source: "patient-app",
     });
     const bookingId = `MF-2026-${1000 + state.bookings.length + 48}`;
