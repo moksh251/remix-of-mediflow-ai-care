@@ -3,8 +3,15 @@ import { MessageCircle, X, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMediflow } from "@/lib/mediflow/store";
-import { calculateWaitTime, getQueueStatus } from "@/lib/mediflow/queue";
 import { HOSPITALS } from "@/lib/mediflow/data";
+import { SYMPTOMS } from "@/lib/mediflow/screening";
+import {
+  listDoctors,
+  shortestWait,
+  trackToken,
+  navigateCare,
+  listHospitals,
+} from "@/lib/mediflow/queries";
 
 interface Msg {
   from: "user" | "bot";
@@ -13,10 +20,39 @@ interface Msg {
 
 const SUGGESTIONS = [
   "Who is available now?",
-  "How long will I wait?",
-  "Which doctor should I see for stomach pain?",
-  "What is my token?",
+  "Shortest wait?",
+  "Stomach pain — which doctor?",
+  "Track token A-104",
 ];
+
+const SYMPTOM_KEYWORDS: Record<string, string> = {
+  stomach: "stomach", gastro: "stomach", abdomen: "stomach", belly: "stomach",
+  vomit: "vomiting", nausea: "vomiting",
+  headache: "headache", migraine: "headache",
+  fever: "fever", temperature: "fever",
+  cough: "cough", cold: "cough", flu: "cough",
+  breathing: "breathing", breathless: "breathing", breath: "breathing",
+  chest: "chest",
+  pregnan: "pregnancy", gyn: "pregnancy", obstetr: "pregnancy",
+  child: "child", pediatric: "child", paediatric: "child", kid: "child",
+  joint: "joint", muscle: "joint", knee: "joint",
+  skin: "skin", rash: "skin",
+  eye: "eye",
+  ear: "ent", nose: "ent", throat: "ent", ent: "ent",
+  checkup: "checkup", "check-up": "checkup",
+};
+
+function matchSymptom(text: string) {
+  for (const [key, id] of Object.entries(SYMPTOM_KEYWORDS)) {
+    if (text.includes(key)) return SYMPTOMS.find((s) => s.id === id);
+  }
+  return undefined;
+}
+
+function extractToken(q: string): string | undefined {
+  const m = q.match(/[A-E]\s?-\s?\d{1,4}/i);
+  return m ? m[0].replace(/\s/g, "") : undefined;
+}
 
 export function AskMediflow() {
   const [open, setOpen] = useState(false);
@@ -24,67 +60,88 @@ export function AskMediflow() {
   const [messages, setMessages] = useState<Msg[]>([
     {
       from: "bot",
-      text: "Hi, I'm Mediflow Assist. I answer only from live hospital demo data — availability, queues, waiting times, fees and your token. I do not provide medical advice or diagnosis.",
+      text: "Hi, I'm Mediflow Assist. I answer only from live hospital demo data — availability, queues, waiting times, fees, symptom navigation and your token. I do not provide medical advice or diagnosis.",
     },
   ]);
 
   const state = useMediflow((s) => s);
   const hospital = HOSPITALS.find((h) => h.id === state.activeHospitalId);
-  const doctors = state.doctors.filter((d) => d.hospitalId === state.activeHospitalId);
 
   function answer(q: string): string {
     const text = q.toLowerCase();
-    const named = doctors.find((d) => text.includes(d.name.toLowerCase().replace("dr. ", "")));
+    const { entries, doctors } = state;
+    const hospitalId = state.activeHospitalId;
 
+    // Token tracking — routed through the shared trackToken query.
     if (text.includes("token")) {
-      const last = state.bookings[state.bookings.length - 1];
-      return last
-        ? `Your latest token is ${last.token} with ${doctors.find((d) => d.id === last.doctorId)?.name ?? "your doctor"} (booking ${last.bookingId}).`
-        : "I don't see a booking in this session yet. Complete a booking through Find My Doctor and your token will appear here.";
+      const token = extractToken(q) ?? state.bookings[state.bookings.length - 1]?.token;
+      if (token) {
+        const t = trackToken(entries, doctors, token);
+        if (t) {
+          const pos = t.position_in_queue ? `position ${t.position_in_queue}` : "not currently waiting";
+          return `Token ${t.token}: ${t.patient_name}, ${t.concern}. With ${t.doctor}${t.department ? ` (${t.department})` : ""}. Status ${t.status}, ${pos}, ${t.patients_ahead} ahead, ~${t.estimated_wait_minutes} min wait.`;
+        }
+        return `No token ${token} found in the current live queue.`;
+      }
+      return "I don't see a booking in this session yet. Complete a booking through Find My Doctor and your token will appear here.";
     }
+
+    // Named doctor — from the shared listDoctors snapshot.
+    const named = doctors.find((d) => text.includes(d.name.toLowerCase().replace("dr. ", "")));
     if (named) {
-      const { minutes, ahead } = calculateWaitTime(state.entries, named);
-      return `${named.name} (${named.specialization}) is ${named.status}. ${ahead} patient(s) waiting, estimated wait ${minutes} min. Consultation fee ₹${named.fee}. Next slot ${named.slots[0] ?? "not available today"}.`;
+      const snap = listDoctors(entries, doctors, { hospitalId }).find((s) => s.id === named.id);
+      if (snap) {
+        return `${snap.name} (${snap.specialization}) is ${snap.status}. ${snap.patients_ahead} patient(s) waiting, estimated wait ${snap.estimated_wait_minutes} min. Consultation fee ₹${snap.consultation_fee_inr}. Next slot ${snap.next_slot}.`;
+      }
     }
-    if (text.includes("available") || text.includes("who is")) {
-      const free = doctors.filter((d) => d.status === "AVAILABLE");
-      return free.length
-        ? `Available now at ${hospital?.name}: ${free.map((d) => `${d.name} (${d.specialization})`).join("; ")}.`
+
+    // Availability.
+    if (text.includes("available") || text.includes("who is") || text.includes("who's") || text.includes("free")) {
+      const rows = listDoctors(entries, doctors, { hospitalId }).filter((s) => s.status === "AVAILABLE");
+      return rows.length
+        ? `Available now at ${hospital?.name}: ${rows.map((s) => `${s.name} (${s.specialization})`).join("; ")}.`
         : "No doctor is marked AVAILABLE right now. Doctors in consultation are still accepting queue entries.";
     }
-    if (text.includes("wait") || text.includes("queue")) {
-      const sorted = doctors
-        .map((d) => ({ d, w: calculateWaitTime(state.entries, d) }))
-        .sort((a, b) => a.w.minutes - b.w.minutes)
-        .slice(0, 3);
-      return `Shortest estimated waits right now: ${sorted.map(({ d, w }) => `${d.name} — ${w.minutes} min (${w.ahead} ahead)`).join("; ")}.`;
+
+    // Shortest wait — routed through shortestWait.
+    if (text.includes("wait") || text.includes("queue") || text.includes("shortest") || text.includes("fastest")) {
+      const rows = shortestWait(entries, doctors, { hospitalId, limit: 3 });
+      return `Shortest estimated waits right now: ${rows.map((s) => `${s.name} — ${s.estimated_wait_minutes} min (${s.patients_ahead} ahead)`).join("; ")}.`;
     }
-    if (text.includes("fee") || text.includes("price") || text.includes("cost")) {
-      return `Consultation fees at ${hospital?.name}: ${doctors.map((d) => `${d.name} ₹${d.fee}`).join(", ")}.`;
+
+    // Fees.
+    if (text.includes("fee") || text.includes("price") || text.includes("cost") || text.includes("charge")) {
+      const rows = listDoctors(entries, doctors, { hospitalId });
+      return `Consultation fees at ${hospital?.name}: ${rows.map((s) => `${s.name} ₹${s.consultation_fee_inr}`).join(", ")}.`;
     }
-    if (text.includes("book")) {
+
+    // Symptom navigation — routed through navigateCare (screening + recommendation engine).
+    const symptom = matchSymptom(text);
+    if (symptom) {
+      const result = navigateCare(entries, doctors, { hospitalId, symptomIds: [symptom.id] });
+      let msg = `${result.care_category} may be an appropriate care category for that concern. `;
+      if (result.urgent) {
+        msg += `⚠️ Emergency signs were reported (${result.reasons.join(", ")}). Please seek immediate medical attention. `;
+      }
+      const opts = result.recommended_doctors.slice(0, 3);
+      msg += opts.length
+        ? `Options: ${opts.map((d) => `${d.name} — ${d.estimated_wait_minutes} min, ${d.patients_ahead} ahead, ₹${d.consultation_fee_inr}`).join("; ")}. `
+        : "No matching doctor is configured at this hospital right now. ";
+      msg += "Mediflow does not provide a diagnosis.";
+      return msg;
+    }
+
+    // Hospital list.
+    if (text.includes("hospital") || text.includes("branch") || text.includes("location")) {
+      const rows = listHospitals(entries, doctors);
+      return `Hospitals in the demo network: ${rows.map((h) => `${h.name} (${h.city}) — ${h.open_now ? "open" : "closed"}`).join("; ")}.`;
+    }
+
+    if (text.includes("book") || text.includes("appointment")) {
       return "You can book from the doctor comparison screen in Find My Doctor. Select a doctor, pick a slot, complete the demo payment and you'll receive a token.";
     }
-    if (text.includes("stomach") || text.includes("gastro")) {
-      return departmentAnswer("Gastroenterology");
-    }
-    if (text.includes("child") || text.includes("pediat")) return departmentAnswer("Pediatrics");
-    if (text.includes("pregnan") || text.includes("gyn")) return departmentAnswer("Gynecology");
-    if (text.includes("headache") || text.includes("neuro")) return departmentAnswer("Neurology");
-    if (text.includes("fever") || text.includes("cough")) return departmentAnswer("General Medicine");
 
-    return "I can answer questions about doctor availability, queue length, estimated waiting time, consultation fees and your token. For symptom-based navigation, please use Find My Doctor.";
-  }
-
-  function departmentAnswer(department: string) {
-    const pool = doctors.filter((d) => d.department === department);
-    if (!pool.length) return `No ${department} doctor is configured at ${hospital?.name} in this demo.`;
-    const rows = pool.map((d) => {
-      const { minutes } = calculateWaitTime(state.entries, d);
-      const { waiting } = getQueueStatus(state.entries, d.id);
-      return `${d.name} — ${d.status}, ${waiting.length} ahead, ~${minutes} min`;
-    });
-    return `${department} may be an appropriate care category for that concern. Current options: ${rows.join("; ")}. Mediflow does not provide a diagnosis.`;
+    return "I can answer about doctor availability, queue length, estimated waiting time, consultation fees, symptom-based navigation and your token. Try “shortest wait”, “who is available”, or “stomach pain”.";
   }
 
   function send(q: string) {
