@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Pause, PlayCircle, SkipForward, Sparkles, Stethoscope } from "lucide-react";
+import { AlertTriangle, Pause, PlayCircle, SkipForward, Sparkles, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DashboardShell, StatCard, StatusPill } from "@/components/mediflow/Shell";
 import { calculateWaitTime, getQueueStatus } from "@/lib/mediflow/queue";
 import { completePatient, markNoShow, startConsultation, updateDoctorStatus, useMediflow } from "@/lib/mediflow/store";
+import type { ScreeningSnapshot } from "@/lib/mediflow/types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/doctor")({
@@ -90,6 +91,7 @@ function DoctorDashboard() {
               age={current?.age}
               concern={current?.concern}
               summary={current?.summary}
+              screening={current?.screening}
               empty="No consultation in progress."
             />
             <PatientPanel
@@ -99,6 +101,7 @@ function DoctorDashboard() {
               age={next?.age}
               concern={next?.concern}
               summary={next?.summary}
+              screening={next?.screening}
               empty="Queue is empty."
             />
           </div>
@@ -142,8 +145,20 @@ function DoctorDashboard() {
   );
 }
 
+function UrgencyBadge({ urgency }: { urgency: ScreeningSnapshot["urgency"] }) {
+  return urgency === "urgent" ? (
+    <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-destructive">
+      <AlertTriangle className="size-3" /> URGENT
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full border border-border bg-muted px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground">
+      Routine
+    </span>
+  );
+}
+
 function PatientPanel({
-  heading, token, name, age, concern, summary, empty,
+  heading, token, name, age, concern, summary, screening, empty,
 }: {
   heading: string;
   token: string | undefined;
@@ -151,6 +166,7 @@ function PatientPanel({
   age: number | undefined;
   concern: string | undefined;
   summary: string | undefined;
+  screening: ScreeningSnapshot | undefined;
   empty: string;
 }) {
   return (
@@ -158,13 +174,45 @@ function PatientPanel({
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{heading}</p>
       {token ? (
         <>
-          <p className="mt-2 text-xl font-bold">{token} · {name}</p>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <p className="text-xl font-bold">{token} · {name}</p>
+            {screening ? <UrgencyBadge urgency={screening.urgency} /> : null}
+          </div>
           <p className="text-sm text-muted-foreground">{age} yrs · {concern}</p>
           <div className="mt-3 rounded-xl bg-muted/50 p-3">
             <p className="flex items-center gap-1.5 text-xs font-semibold"><Sparkles className="size-3.5 text-primary" /> AI patient summary</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {summary ?? `Patient reports ${concern?.toLowerCase()}. Details collected at reception.`}
             </p>
+
+            {screening && screening.reasons.length > 0 ? (
+              <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5">
+                <p className="flex items-center gap-1 text-xs font-semibold text-destructive">
+                  <AlertTriangle className="size-3.5" /> Emergency signs reported
+                </p>
+                <ul className="mt-1 space-y-0.5 text-xs text-destructive">
+                  {screening.reasons.map((r) => <li key={r}>• {r}</li>)}
+                </ul>
+                <p className="mt-1.5 text-[11px] text-destructive/80">
+                  Escalate per hospital protocol — do not treat as routine.
+                </p>
+              </div>
+            ) : null}
+
+            {screening && screening.answers.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-muted-foreground">Screening responses</p>
+                <dl className="mt-1.5 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+                  {screening.answers.map((a) => (
+                    <div key={a.label} className="flex justify-between gap-2 border-b border-border/40 py-0.5">
+                      <dt className="text-muted-foreground">{a.label}</dt>
+                      <dd className="text-right font-medium text-foreground">{a.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+
             <p className="mt-2 text-[11px] text-muted-foreground">
               Generated from patient-provided information. Not a diagnosis.
             </p>
